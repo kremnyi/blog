@@ -1,0 +1,23 @@
+{
+  "name": "blog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm --prefix frontend run build",
+    "dev": "wrangler d1 migrations apply blog --local && wrangler dev",
+    "dev:frontend": "npm --prefix frontend start",
+    "deploy": "npm run build && wrangler d1 migrations apply blog --remote && wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.0",
+    "@cloudflare/workers-types": "^5.20261012.1",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.149.0"
+  }
+}

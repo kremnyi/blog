@@ -1,104 +1,91 @@
-# Blog Platform (Event-Driven Demo)
+# Blog Platform (Poverty-Driven Demo)
 
-**Live Demo**: [blog.olehkazaiev.com](https://blog.olehkazaiev.com)
+**Live Demo**: hopefully `blog.<you>.workers.dev` soon, on the free plan.
 
-A full-stack blog platform deployed on a **Raspberry Pi 5**, designed to showcase **microservices**, **event-driven architecture**, and **production-grade patterns** (Kafka, Elasticsearch, Celery).
+The old version of this repo ran a blog on a **Raspberry Pi 5** because hosting is expensive.
+To get the price to zero it used Kafka, Elasticsearch, Celery, RabbitMQ, Redis, Postgres, Traefik,
+LocalStack, LocalStripe, a FastAPI microservice, two Django replicas, and a Cloudflare Tunnel
+pointed at all of it.
 
-> **Note**: All external services (AWS S3, Stripe) are **mocked** (LocalStack, LocalStripe) to keep this project self-contained and cost-free.
+This version is one TypeScript Worker on the Cloudflare free plan. It does the same things and
+costs the same $0. It also stays up when someone trips over the Pi's power cable.
 
-## Core Features & Workflow
+## Core Features
 
-This project demonstrates a complete content platform designed to showcase complex business logic and architectural patterns.
+Unchanged, and the React app is untouched apart from the footer:
 
-### Key Capabilities
-*   **Content Creation**: Users can create standard posts, **paid posts**, and **delayed posts** (automatically published via Celery tasks).
-*   **Monetization**:
-    *   **Buy Subscription**: Unlock premium features using a mock credit card (e.g., `4242...`).
-    *   **Buy Post**: Purchase access to individual paid articles.
-*   **Interactive Features**:
-    *   Create and publish content (Active Subscription Required or admin role).
-    *   Engage with the community via **likes, dislikes, and comments**.
+*   **Content Creation**: standard posts, **paid posts**, and **delayed posts** (published by a Cron Trigger).
+*   **Monetization**: buy a subscription or a single post with the same mock test cards (`4242...`).
+*   **Interactive Features**: likes, dislikes, comments, search, in-app "emails", and profile pictures.
 
 ## Architecture
 
-The system uses an event-driven approach where the Django backend and FastAPI payment service communicate asynchronously via Kafka. Both services implement **Producers** and **Consumers** to handle distributed transactions (e.g., subscription activation, payment confirmation).
-
-**Cloudflare Tunnel** exposes specific services (Frontend, Backend, LocalStack) to the internet.
-
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Cloudflare Tunnel                      │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-┌──────────────────────────────▼──────────────────────────────┐
-│                        Traefik Proxy                        │
-└──────┬───────────────────────┬───────────────────────┬──────┘
-       │                       │                       │
-┌──────▼─────┐          ┌──────▼──────┐          ┌─────▼──────┐
-│  Frontend  │          │  Backend x2 │─────────►│ LocalStack │
-│   (React)  │          │   (Django)  │          │  (S3 Mock) │
-└────────────┘          └──────┬──────┘          └────────────┘
-                               │
-         ┌──────────────┬──────┼──────┬──────────────┐
-         │              │      │      │              │
-    ┌────▼─────┐   ┌────▼──┐   │   ┌──▼────┐    ┌────▼─────┐
-    │ Postgres │   │ Redis │   │   │Elastic│    │ RabbitMQ │
-    │   (DB)   │   │(Cache)│   │   │(Search)    │ (Broker) │
-    └──────────┘   └───────┘   │   └───────┘    └────▲─────┘
-                               │                     │
-                               │                ┌────┴─────┐
-                               │                │  Celery  │
-                               │                │ (Workers)│
-                               │                └──────────┘
-                               │
-                       ┌───────▼───────┐
-                       │ Apache Kafka  │
-                       │(Event Stream) │
-                       └───────▲───────┘
-                               │
-               ┌───────────────┴───────────────┐
-               │                               │
-       ┌───────▼───────┐               ┌───────▼───────┐
-       │   Payment x2  │               │ Payment Evts  │
-       │   (FastAPI)   │               │  (Consumer)   │
-       │  [Prod/Cons]  │               │   (Django)    │
-       └───────┬───────┘               └───────────────┘
-               │
-       ┌───────▼───────┐
-       │  LocalStripe  │
-       │ (Stripe Mock) │
-       └───────────────┘
+┌──────────────────────────────────────────┐
+│        Cloudflare Worker (free)          │
+│                                          │
+│  React build ─ static assets             │
+│  /api/*      ─ Hono, same REST API       │
+│  cron        ─ scheduled posts, expiry   │
+└───────┬──────────────────────┬───────────┘
+        │                      │
+   ┌────▼────┐            ┌────▼────┐
+   │   D1    │            │   KV    │
+   │ SQLite  │            │ avatars │
+   │ + FTS5  │            └─────────┘
+   └─────────┘
 ```
+
+| Before | After |
+|---|---|
+| Django 5 + DRF, 2 replicas behind Traefik | Hono on Workers (`worker/src`) |
+| FastAPI payment microservice | `routes/billing.ts` |
+| Kafka 4.1 (producers, consumers, topics) | a function call |
+| Celery 5 + RabbitMQ 4.2 | Cron Triggers in `wrangler.jsonc` |
+| Postgres 17 | D1 (`migrations/0001_init.sql`) |
+| Elasticsearch 9 | SQLite FTS5 virtual table |
+| Redis 8 | not needed |
+| S3 via LocalStack | Workers KV |
+| Stripe via LocalStripe | the frontend already checked the fake card itself, so "confirm" is one `UPDATE` |
+| Docker Compose, Traefik, Cloudflare Tunnel, Raspberry Pi 5 | `npm run deploy` |
 
 ### Tech Stack
-*   **Backend**: Django 5, Python 3.13, FastAPI (Microservice)
-*   **Frontend**: React 18, TypeScript, MUI
-*   **Data**: PostgreSQL 17, Redis 8, Elasticsearch 9
-*   **Messaging**: Apache Kafka 4.1, RabbitMQ 4.2, Celery 5
-*   **Infrastructure**: Docker Compose, Traefik v3.6
+*   **Backend**: TypeScript, Hono, Cloudflare Workers
+*   **Frontend**: React 18, TypeScript, MUI (unchanged)
+*   **Data**: D1, KV
+*   **Infrastructure**: a free Cloudflare account
 
 ## Quick Start
 
-1.  **Clone & Config**:
-    ```bash
-    git clone <repo>
-    cd blog
-    cp .env.sample .env
-    ```
-2.  **Run (Production Mode)**:
-    ```bash
-    make prod-up
-    ```
-3.  **Access**:
-    *   Frontend: `http://localhost:3081`
-    *   API: `http://localhost:3082`
-    *   LocalStack: `http://localhost:3083`
+```bash
+npm install && npm --prefix frontend install
+npm run build        # build the React app into frontend/build
+npm run dev          # local D1 + Worker on http://localhost:8787
+npm test             # API tests inside the Workers runtime (vitest)
+```
 
-## Development Commands
+For frontend hot reload, run `npm run dev:frontend` next to `npm run dev`. CRA proxies `/api` to port 8787.
 
-*   `make dev-up` - Start development stack with hot-reload.
-*   `make test` - Run full test suite (pytest, flake8, mypy).
-*   `make prod-rebuild` - Rebuild and restart production containers.
+## Deploy (free plan, no credit card)
+
+```bash
+npx wrangler login
+npx wrangler d1 create blog                # paste database_id into wrangler.jsonc
+npx wrangler kv namespace create MEDIA     # paste id into wrangler.jsonc
+npm run deploy                             # build, migrate, deploy
+```
+
+Make yourself an admin (Django admin did not survive the move):
+
+```bash
+npx wrangler d1 execute blog --remote --command "UPDATE users SET is_admin = 1 WHERE email = 'you@example.com'"
+```
+
+## Free plan notes
+
+*   100k requests per day. The Pi was never going to get there either.
+*   10 ms CPU per request, so passwords use PBKDF2-SHA256 with 20k rounds. The count is stored in each hash, so you can raise it later.
+*   KV allows 1k writes per day on the free plan. That is plenty for avatar uploads.
 
 ---
-*Created by Oleh Kazaiev*
+*Originally created by Oleh Kazaiev. Ported to a budget he can actually afford.*

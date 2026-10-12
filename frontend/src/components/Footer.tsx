@@ -19,8 +19,8 @@ const Footer = () => {
         >
             <Container maxWidth="lg">
                 <Typography variant="body1" align="center">
-                    © {new Date().getFullYear()} My Blog - Built with Django,
-                    React, and Material UI
+                    © {new Date().getFullYear()} My Blog - Built with React and
+                    Material UI, served for $0 by Cloudflare Workers
                 </Typography>
             </Container>
         </Box>

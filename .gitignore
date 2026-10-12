@@ -132,3 +132,10 @@ celerybeat.pid
 *.tfstate
 *.tfstate.backup
 .terragrunt-cache/
+
+# Cloudflare
+.wrangler/
+.dev.vars
+!worker/src/lib/
+!migrations/*.sql
+!/package-lock.json
